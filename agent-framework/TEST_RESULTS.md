@@ -62,6 +62,11 @@ All packages can be successfully imported:
 - ✅ Code compiles and builds successfully
 - ✅ TypeScript types correct
 
+**OllamaProvider** (NEW!):
+- ✅ Code compiles and builds successfully
+- ✅ Supports local models
+- ✅ No API key required
+
 ### Runtime Adapter Tests: ✅ PASS
 
 **NodeAdapter**:
@@ -72,12 +77,13 @@ All packages can be successfully imported:
 
 ### Tools Tests: ✅ PASS
 
-**CoreTools** (5 tools):
+**CoreTools** (6 tools):
 1. ✅ `read_file` - Definition valid
 2. ✅ `write_file` - Definition valid
 3. ✅ `list_files` - Definition valid
-4. ✅ `execute_command` - Definition valid
-5. ✅ `attempt_completion` - Definition valid
+4. ✅ `search_files` - Definition valid (NEW!)
+5. ✅ `execute_command` - Definition valid
+6. ✅ `attempt_completion` - Definition valid
 
 All tool definitions include:
 - Valid name
@@ -197,18 +203,32 @@ The framework is working correctly!
 
 ## Demo Application Status: ✅ READY
 
-The `examples/basic-cli` demo application:
+Two demo applications are included:
+
+### 1. Basic CLI (`examples/basic-cli`)
 - ✅ Builds successfully (18KB output)
 - ✅ All dependencies resolved
 - ✅ Ready to run with API keys
 - ✅ Includes comprehensive error handling
 - ✅ Demonstrates all core features
 
-To run the demo:
+### 2. Code Analyzer (`examples/code-analyzer`) - NEW!
+- ✅ Builds successfully
+- ✅ Real-world use case example
+- ✅ Supports both Anthropic and Ollama
+- ✅ Demonstrates multiple tools
+- ✅ Professional output formatting
+
+To run the demos:
 ```bash
+# Basic CLI
 cd examples/basic-cli
 echo "ANTHROPIC_API_KEY=your-key-here" > .env
 node dist/index.js "Create a hello.txt file"
+
+# Code Analyzer
+cd examples/code-analyzer
+node dist/index.js src/ --ollama  # Use local Ollama
 ```
 
 ## Conclusion

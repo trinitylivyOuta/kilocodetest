@@ -64,8 +64,8 @@ console.log(task.result)
 ## Packages
 
 - **[@agent-framework/core](./packages/core)** - Core agent execution engine
-- **[@agent-framework/api](./packages/api)** - LLM provider abstraction
-- **[@agent-framework/tools](./packages/tools)** - Tool system and built-in tools
+- **[@agent-framework/api](./packages/api)** - LLM provider abstraction (Anthropic, OpenAI, Ollama)
+- **[@agent-framework/tools](./packages/tools)** - Tool system and 6 built-in tools
 - **[@agent-framework/runtime](./packages/runtime)** - Runtime adapters for different environments
 - **[@agent-framework/prompts](./packages/prompts)** - Prompt building and templates
 - **[@agent-framework/types](./packages/types)** - Shared TypeScript types
@@ -100,16 +100,24 @@ console.log(task.result)
 ## Documentation
 
 - [Getting Started](./docs/getting-started.md)
+- [Complete Usage Guide](./docs/USAGE_GUIDE.md) - Comprehensive guide with examples (NEW!)
 - [API Reference](./docs/api-reference.md)
 - [Creating Custom Tools](./docs/creating-tools.md)
 - [Creating Custom Adapters](./docs/creating-adapters.md)
 - [Examples](./examples)
 
+## Additional Resources
+
+- [Framework Analysis](../FRAMEWORK_ANALYSIS.md) - Detailed architecture analysis
+- [Implementation Summary](../IMPLEMENTATION_SUMMARY.md) - Project summary
+- [Test Results](./TEST_RESULTS.md) - Comprehensive test report
+- [Gaps Analysis](./GAPS_ANALYSIS.md) - Roadmap and next steps (NEW!)
+
 ## Examples
 
 - [Basic CLI](./examples/basic-cli) - Simple command-line agent
-- [File Processor](./examples/file-processor) - Process files with AI
-- [Code Assistant](./examples/code-assistant) - AI coding assistant
+- [Code Analyzer](./examples/code-analyzer) - Real-world code analysis example (NEW!)
+- More examples coming soon...
 
 ## Development
 

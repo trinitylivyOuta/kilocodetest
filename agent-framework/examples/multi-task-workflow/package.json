@@ -1,0 +1,23 @@
+{
+  "name": "example-multi-task-workflow",
+  "version": "0.1.0",
+  "description": "Multi-task workflow example showing task orchestration",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-framework/api": "workspace:*",
+    "@agent-framework/core": "workspace:*",
+    "@agent-framework/runtime": "workspace:*",
+    "@agent-framework/tools": "workspace:*",
+    "@agent-framework/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.5"
+  }
+}

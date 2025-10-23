@@ -9,6 +9,7 @@ export { ExecuteCommandTool } from './execute-command.js'
 export { ListFilesTool } from './list-files.js'
 export { SearchFilesTool } from './search-files.js'
 export { AttemptCompletionTool } from './attempt-completion.js'
+export { BrowserTool } from './browser.js'
 
 // Export convenient tool collections
 import { ReadFileTool } from './read-file.js'
@@ -17,6 +18,7 @@ import { ExecuteCommandTool } from './execute-command.js'
 import { ListFilesTool } from './list-files.js'
 import { SearchFilesTool } from './search-files.js'
 import { AttemptCompletionTool } from './attempt-completion.js'
+import { BrowserTool } from './browser.js'
 
 export const FileTools = [
   new ReadFileTool(),
@@ -33,4 +35,9 @@ export const CoreTools = [
   ...FileTools,
   ...CommandTools,
   new AttemptCompletionTool()
+]
+
+export const ExtendedTools = [
+  ...CoreTools,
+  new BrowserTool()
 ]

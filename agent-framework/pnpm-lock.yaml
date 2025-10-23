@@ -99,6 +99,34 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
+  examples/multi-task-workflow:
+    dependencies:
+      '@agent-framework/api':
+        specifier: workspace:*
+        version: link:../../packages/api
+      '@agent-framework/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agent-framework/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@agent-framework/tools':
+        specifier: workspace:*
+        version: link:../../packages/tools
+      '@agent-framework/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.23
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.0(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
   packages/api:
     dependencies:
       '@agent-framework/types':

@@ -6,3 +6,4 @@ export { BaseApiHandler, type ApiHandler, type ApiHandlerOptions } from './base.
 export { AnthropicProvider } from './anthropic.js'
 export { OpenAIProvider } from './openai.js'
 export { OllamaProvider } from './ollama.js'
+// export { GeminiProvider } from './gemini.js' // TODO: Fix API compatibility

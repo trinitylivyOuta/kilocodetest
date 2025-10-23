@@ -1,0 +1,33 @@
+{
+  "name": "@agent-framework/runtime",
+  "version": "0.1.0",
+  "description": "Runtime adapters for different execution environments",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agent-framework/types": "workspace:*"
+  },
+  "keywords": [
+    "runtime",
+    "adapter",
+    "node",
+    "cli"
+  ],
+  "license": "MIT"
+}

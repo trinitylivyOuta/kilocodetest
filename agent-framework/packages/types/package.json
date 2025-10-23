@@ -1,0 +1,30 @@
+{
+  "name": "@agent-framework/types",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types for Agent Framework",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "types",
+    "typescript",
+    "agent",
+    "ai"
+  ],
+  "license": "MIT"
+}

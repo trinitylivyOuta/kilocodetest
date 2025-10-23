@@ -8,7 +8,6 @@ import type {
   TaskOptions,
   TaskStatus,
   TaskResult,
-  TaskEvent,
   Message,
   ContentBlock,
   ToolUse,
@@ -23,7 +22,6 @@ export class Task extends EventEmitter {
   private taskId: string
   private status: TaskStatus = 'pending'
   private apiHandler: ApiHandler
-  private adapter: RuntimeAdapter
   private toolExecutor: ToolExecutor
   private systemPrompt: string
   private messages: Message[] = []
@@ -46,7 +44,6 @@ export class Task extends EventEmitter {
     super()
     this.taskId = taskId
     this.apiHandler = apiHandler
-    this.adapter = adapter
     this.systemPrompt = options.systemPrompt || this.buildDefaultSystemPrompt()
     
     // Initialize tool executor
@@ -85,7 +82,7 @@ Think step by step and explain your reasoning.`
     try {
       await this.executionLoop()
       
-      if (!this.aborted && this.status !== 'completed') {
+      if (!this.aborted) {
         this.status = 'completed'
         this.result = {
           success: true,
@@ -234,7 +231,7 @@ Think step by step and explain your reasoning.`
   /**
    * Build assistant content with text and tool uses
    */
-  private buildAssistantContent(text: string, toolUses: ToolUse[]): ContentBlock[] {
+  private buildAssistantContent(text: string, _toolUses: ToolUse[]): ContentBlock[] {
     const content: ContentBlock[] = []
     
     if (text) {

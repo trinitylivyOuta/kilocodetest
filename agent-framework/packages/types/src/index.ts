@@ -230,36 +230,3 @@ export interface AgentConfig {
   maxTokens?: number
   temperature?: number
 }
-
-// ============================================================================
-// Export all types
-// ============================================================================
-
-export type {
-  ProviderName,
-  ModelInfo,
-  ProviderSettings,
-  MessageRole,
-  TextBlock,
-  ImageBlock,
-  ContentBlock,
-  Message,
-  ToolParameter,
-  ToolDefinition,
-  ToolUse,
-  ToolResult,
-  ToolName,
-  TaskStatus,
-  TaskMetadata,
-  TaskOptions,
-  TaskResult,
-  TaskEventType,
-  TaskEvent,
-  FileSystem,
-  CommandExecutor,
-  CommandResult,
-  RuntimeAdapter,
-  TokenUsage,
-  StreamChunk,
-  AgentConfig
-}

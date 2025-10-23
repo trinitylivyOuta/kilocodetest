@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from 'crypto'
-import type { RuntimeAdapter, AgentConfig, TaskOptions } from '@agent-framework/types'
+import type { RuntimeAdapter, TaskOptions } from '@agent-framework/types'
 import type { ApiHandler } from '@agent-framework/api'
 import type { BaseTool } from '@agent-framework/tools'
 import { Task } from './task.js'

@@ -4,7 +4,7 @@
  */
 
 import OpenAI from 'openai'
-import type { ProviderSettings, StreamChunk, ModelInfo, ToolUse } from '@agent-framework/types'
+import type { ProviderSettings, StreamChunk, ModelInfo } from '@agent-framework/types'
 import { BaseApiHandler, type ApiHandlerOptions } from './base.js'
 
 export class OpenAIProvider extends BaseApiHandler {

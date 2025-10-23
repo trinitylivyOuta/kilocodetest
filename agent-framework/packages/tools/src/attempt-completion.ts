@@ -24,7 +24,7 @@ export class AttemptCompletionTool extends BaseTool {
     }
   }
   
-  async execute(input: Record<string, any>, context: ToolContext): Promise<ToolResult> {
+  async execute(input: Record<string, any>, _context: ToolContext): Promise<ToolResult> {
     this.validateInput(input)
     
     const { result } = input

@@ -13,6 +13,7 @@
     "dev": "pnpm -r --parallel dev",
     "clean": "pnpm -r clean",
     "test": "pnpm -r test",
+    "verify": "node verify-framework.mjs",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"packages/**/*.{ts,json,md}\"",
     "typecheck": "pnpm -r typecheck"

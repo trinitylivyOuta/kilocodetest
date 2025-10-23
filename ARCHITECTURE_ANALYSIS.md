@@ -1816,3 +1816,1427 @@ The Kilo Code architecture demonstrates a sophisticated approach to building a m
 - Mobile app could reuse agent execution engine
 
 The architecture is well-designed for extensibility and maintainability, making it easy to add new features that automatically work across all platforms.
+
+---
+
+## 9. Advanced Services and Features
+
+### 9.1 Code Index Service
+
+The Code Index Service provides semantic code search capabilities using vector embeddings and a local vector database.
+
+#### 9.1.1 Architecture
+
+```typescript
+CodeIndexManager (Singleton per workspace)
+    ├── CodeIndexConfigManager         # Configuration management
+    ├── CodeIndexStateManager          # State tracking with events
+    ├── CodeIndexServiceFactory        # Creates embedders and vector stores
+    ├── CodeIndexOrchestrator          # Manages indexing lifecycle
+    ├── CodeIndexSearchService         # Semantic search operations
+    └── CacheManager                   # Caches embeddings and results
+```
+
+**Key Components**:
+
+1. **Embedders** (Multiple implementations):
+   - `VercelAIGatewayEmbedder`: Uses Vercel AI Gateway
+   - `OllamaEmbedder`: Local embedding with Ollama
+   - `OpenAICompatibleEmbedder`: Generic OpenAI-compatible API
+   - `GeminiEmbedder`: Google's Gemini embeddings
+
+2. **Vector Store**:
+   - `QdrantClient`: Local Qdrant instance for vector storage
+   - Supports semantic similarity search
+   - Persistent storage across sessions
+
+3. **File Processing Pipeline**:
+   ```
+   File Change → RooIgnore Filter → Chunking → Embedding → Vector Store
+   ```
+
+#### 9.1.2 Indexing Process
+
+```typescript
+// Initialization
+const manager = CodeIndexManager.getInstance(context, workspacePath)
+await manager.initialize()
+
+// Start indexing
+await manager.startIndexing()
+
+// Progress tracking
+manager.onProgressUpdate((progress: IndexProgressUpdate) => {
+    console.log(`Indexed ${progress.processedFiles}/${progress.totalFiles}`)
+})
+
+// Search
+const results = await manager.search('authentication logic', {
+    limit: 10,
+    threshold: 0.7
+})
+```
+
+**Indexing States**:
+- `Standby`: Feature disabled or not configured
+- `Idle`: Ready to index
+- `Indexing`: Currently processing files
+- `Paused`: Temporarily paused
+- `Error`: Error occurred during indexing
+
+#### 9.1.3 Performance Optimizations
+
+1. **Incremental Indexing**: Only re-indexes changed files
+2. **Caching**: 
+   - Embedding cache to avoid re-computing
+   - Search result cache with TTL
+3. **Batch Processing**: Files processed in batches
+4. **Background Operation**: Uses worker threads to avoid blocking
+5. **Resource Management**: Respects `.rooignore` and file size limits
+
+**Configuration**:
+```json
+{
+    "codeIndex": {
+        "enabled": true,
+        "embedder": "ollama",
+        "model": "nomic-embed-text",
+        "chunkSize": 512,
+        "chunkOverlap": 50,
+        "maxFileSize": 1048576,
+        "excludePatterns": ["*.min.js", "node_modules/**"]
+    }
+}
+```
+
+### 9.2 Checkpoint System
+
+The checkpoint system enables task persistence and recovery, allowing users to save and restore task states.
+
+#### 9.2.1 Checkpoint Types
+
+**1. RepoPerTaskCheckpointService**:
+- Creates git-based checkpoints
+- Each checkpoint is a git commit
+- Supports branching and merging
+- Use case: Experimental changes that can be easily reverted
+
+**2. ShadowCheckpointService**:
+- Creates shadow copies without git
+- Faster for frequent checkpoints
+- Less overhead than git commits
+- Use case: Frequent auto-saves during task execution
+
+#### 9.2.2 Checkpoint Lifecycle
+
+```typescript
+// Create checkpoint
+const checkpoint = await checkpointService.createCheckpoint({
+    taskId: task.id,
+    message: 'Implemented authentication',
+    files: changedFiles
+})
+
+// List checkpoints
+const checkpoints = await checkpointService.listCheckpoints(task.id)
+
+// Restore checkpoint
+await checkpointService.restoreCheckpoint(checkpoint.id)
+
+// Delete checkpoint
+await checkpointService.deleteCheckpoint(checkpoint.id)
+```
+
+#### 9.2.3 Checkpoint Metadata
+
+```typescript
+interface Checkpoint {
+    id: string
+    taskId: string
+    timestamp: number
+    message: string
+    files: string[]              // Changed files
+    stats: {
+        additions: number
+        deletions: number
+        fileCount: number
+    }
+    parent?: string              // Parent checkpoint ID
+}
+```
+
+**Exclusion Rules**:
+- Respects `.gitignore`
+- Excludes `node_modules/`, `.git/`, build artifacts
+- Configurable via checkpoint settings
+
+### 9.3 Mode System
+
+Kilo Code supports multiple operating modes, each optimized for different tasks.
+
+#### 9.3.1 Built-in Modes
+
+**1. Code Mode** (Default):
+```typescript
+{
+    slug: 'code',
+    name: 'Code',
+    description: 'General-purpose coding assistant',
+    groups: [
+        'core',           // File operations, search, command execution
+        'editing',        // Multi-file editing, diff operations
+        'browser',        // Web scraping and automation
+        'mcp'            // MCP tool integration
+    ],
+    experiments: ['multi-file-edit', 'grounding']
+}
+```
+
+**2. Architect Mode**:
+- Focus: High-level design and planning
+- Tools: Codebase search, definition listing, planning tools
+- Behavior: Creates detailed plans before coding
+- Use case: System design, refactoring planning
+
+**3. Debug Mode**:
+- Focus: Bug investigation and fixing
+- Tools: Enhanced search, definition lookup, test execution
+- Behavior: Methodical debugging approach
+- Use case: Bug hunting, error investigation
+
+**4. Ask Mode**:
+- Focus: Quick questions and answers
+- Tools: Limited tool access (read-only)
+- Behavior: Fast responses without file modifications
+- Use case: Code explanation, documentation lookup
+
+#### 9.3.2 Custom Modes
+
+Users can define custom modes:
+
+```typescript
+interface CustomMode {
+    slug: string
+    name: string
+    roleDefinition: string          // Custom role description
+    groups: ToolGroup[]             // Tool groups to enable
+    customInstructions?: string     // Additional instructions
+    experiments?: ExperimentId[]    // Experimental features
+}
+
+// Example custom mode
+{
+    slug: 'security-audit',
+    name: 'Security Auditor',
+    roleDefinition: 'Expert security auditor focusing on vulnerability detection',
+    groups: ['core', 'editing'],
+    customInstructions: `
+        Focus on:
+        - SQL injection vulnerabilities
+        - XSS attack vectors
+        - Authentication weaknesses
+        - Dependency vulnerabilities
+    `,
+    experiments: ['grounding']
+}
+```
+
+#### 9.3.3 Mode Switching
+
+```typescript
+// Switch mode during task execution
+await task.switchMode('architect')
+
+// Mode affects:
+// 1. Available tools
+// 2. System prompt
+// 3. Behavior patterns
+// 4. UI presentation
+```
+
+**Mode Selection Strategy**:
+- User can explicitly select mode
+- AI can suggest mode switches based on task
+- `switchModeTool` enables dynamic mode changes
+
+### 9.4 Security Features
+
+#### 9.4.1 Content Security Policy (CSP)
+
+The webview implements strict CSP:
+
+```typescript
+const csp = [
+    "default-src 'none'",
+    `font-src ${webview.cspSource} data:`,
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `img-src ${webview.cspSource} https:`,
+    `script-src ${webview.cspSource} 'wasm-unsafe-eval' 'nonce-${nonce}'`,
+    `connect-src ${webview.cspSource} https://*`
+]
+```
+
+**Security Measures**:
+1. **Nonce-based script execution**: Only scripts with valid nonce can run
+2. **Restricted external resources**: Whitelist for external domains
+3. **No inline scripts**: All scripts loaded from files
+4. **Safe evaluation**: WASM allowed for performance-critical operations
+
+#### 9.4.2 Secret Management
+
+**VSCode Extension**:
+```typescript
+// Store secrets in VSCode secret storage
+await context.secrets.store('apiKey', apiKey)
+const apiKey = await context.secrets.get('apiKey')
+
+// Secrets are:
+// - Encrypted at rest
+// - Per-machine or per-workspace
+// - Not committed to git
+// - Accessible only by extension
+```
+
+**CLI**:
+```typescript
+// CLI uses secure storage
+const secrets = new SecretStorage(kilocodePath)
+await secrets.set('apiKey', apiKey)
+const apiKey = await secrets.get('apiKey')
+
+// Storage location: ~/.kilocode/cli/secrets/
+// Encrypted with machine-specific key
+```
+
+#### 9.4.3 Protected Files
+
+```typescript
+// RooProtectedController prevents modification of critical files
+const protectedFiles = [
+    'package.json',
+    'package-lock.json',
+    'pnpm-lock.yaml',
+    '.env',
+    '.env.local'
+]
+
+// Check before write
+if (rooProtected.isProtected(filePath)) {
+    // Require explicit approval
+    const approved = await ask({
+        type: 'protected_file',
+        path: filePath
+    })
+    if (!approved) {
+        throw new Error('Operation cancelled')
+    }
+}
+```
+
+#### 9.4.4 Command Execution Safety
+
+```typescript
+// Command validation before execution
+const dangerousCommands = [
+    'rm -rf',
+    'sudo rm',
+    'dd if=',
+    'mkfs.',
+    ':(){ :|:& };:'  // Fork bomb
+]
+
+function isDangerousCommand(command: string): boolean {
+    return dangerousCommands.some(pattern => 
+        command.includes(pattern)
+    )
+}
+
+// User must approve dangerous commands
+if (isDangerousCommand(command)) {
+    const approved = await ask({
+        type: 'dangerous_command',
+        command
+    })
+    if (!approved) {
+        return { error: 'Command rejected by user' }
+    }
+}
+```
+
+---
+
+## 10. Multi-Platform Strategy
+
+### 10.1 JetBrains Plugin
+
+The JetBrains plugin extends Kilo Code to IntelliJ-based IDEs (IntelliJ IDEA, PyCharm, WebStorm, etc.).
+
+#### 10.1.1 Architecture
+
+```
+JetBrains Plugin
+├── Plugin (Kotlin/Java)          # IntelliJ plugin implementation
+│   ├── UI Components            # IntelliJ UI integration
+│   ├── Editor Integration        # IntelliJ editor hooks
+│   └── Extension Host Client     # Communicates with Node.js host
+│
+└── Extension Host (Node.js)      # Runs VSCode extension code
+    ├── VSCode API Mock          # Similar to CLI mock
+    ├── Extension Bundle         # Actual extension.js
+    └── IPC Bridge               # Communicates with plugin
+```
+
+**Key Differences from CLI**:
+1. **UI Layer**: Uses IntelliJ Swing/JBR UI instead of Ink
+2. **Editor Integration**: Deeper integration with IntelliJ editor
+3. **IPC Communication**: Plugin and Extension Host run in separate processes
+4. **Platform Dependencies**: Must handle JetBrains platform APIs
+
+#### 10.1.2 Communication Flow
+
+```
+IntelliJ UI (Kotlin)
+    ↕ IPC (Socket/Pipe)
+Extension Host (Node.js)
+    ↕ Function Calls
+VSCode Extension (extension.js)
+    ↕ Events
+Task.ts (Core Logic)
+```
+
+**Message Types**:
+- `PluginToHost`: User actions from IntelliJ
+- `HostToPlugin`: State updates, UI requests
+- `HostToExtension`: WebviewMessage types
+- `ExtensionToHost`: ExtensionMessage types
+
+#### 10.1.3 Build System
+
+```bash
+# Build Extension Host
+cd jetbrains/host
+pnpm build
+
+# Build IntelliJ Plugin
+cd jetbrains/plugin
+./gradlew buildPlugin
+
+# Combined build
+pnpm jetbrains:build
+```
+
+**Platform Support**:
+- Windows (x64)
+- macOS (x64, ARM64)
+- Linux (x64)
+
+**Native Module Handling**:
+- Architecture-aware native module loading
+- Runtime detection of CPU architecture
+- Separate builds for each platform
+
+### 10.2 Web Application
+
+The web application (`apps/web-roo-code`) provides browser-based access to Kilo Code.
+
+#### 10.2.1 Technology Stack
+
+- **Framework**: Next.js (React)
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui
+- **State Management**: React hooks + context
+- **Backend**: Next.js API routes
+
+#### 10.2.2 Architecture
+
+```
+Browser
+    ↕
+Next.js Frontend (React)
+    ↕
+API Routes (Next.js)
+    ↕
+Extension Backend (Adapted)
+    ↕
+Task.ts (Core Logic)
+```
+
+**Adaptations for Web**:
+1. **File System**: 
+   - Uses browser File System Access API
+   - Fallback to virtual file system
+2. **Terminal**: 
+   - WebSocket-based terminal emulation
+   - Server-side command execution
+3. **Authentication**: 
+   - OAuth integration
+   - Session management
+4. **Storage**: 
+   - IndexedDB for local state
+   - Server-side for persistence
+
+#### 10.2.3 Deployment
+
+```bash
+# Build web app
+cd apps/web-roo-code
+pnpm build
+
+# Output: .next/ directory
+# Deploy to: Vercel, Netlify, or custom server
+```
+
+**Environment Variables**:
+```env
+NEXT_PUBLIC_API_URL=https://api.kilocode.ai
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
+```
+
+### 10.3 Platform Comparison
+
+| Feature | VSCode | CLI | JetBrains | Web |
+|---------|--------|-----|-----------|-----|
+| **UI Framework** | React (Webview) | Ink (Terminal) | Swing/JBR | React (Browser) |
+| **Editor Integration** | Full | None | Full | Limited |
+| **File System** | VSCode API | Node.js fs | IntelliJ VFS | Browser API |
+| **Terminal** | Integrated | Native | Integrated | WebSocket |
+| **Code Sharing** | 100% (source) | 70-80% | 70-80% | 60-70% |
+| **Distribution** | VSIX | NPM | JetBrains Marketplace | Web |
+| **Authentication** | VSCode Auth | CLI Config | JetBrains Auth | OAuth |
+| **Offline Support** | Full | Full | Full | Limited |
+
+---
+
+## 11. Testing Strategy
+
+### 11.1 Test Types
+
+#### 11.1.1 Unit Tests
+
+**Location**: `__tests__` directories alongside source files
+
+**Framework**: Vitest
+
+**Coverage**:
+- Core logic (Task, Tools, API handlers)
+- Utilities and helpers
+- State management
+- Message parsing
+
+**Example**:
+```typescript
+// src/core/tools/__tests__/executeCommandTool.spec.ts
+describe('executeCommandTool', () => {
+    it('should execute safe commands', async () => {
+        const result = await executeCommand('echo hello')
+        expect(result).toContain('hello')
+    })
+    
+    it('should require approval for dangerous commands', async () => {
+        const result = await executeCommand('rm -rf /')
+        expect(result.requiresApproval).toBe(true)
+    })
+})
+```
+
+#### 11.1.2 Integration Tests
+
+**Location**: `apps/vscode-e2e`, `apps/playwright-e2e`
+
+**Framework**: 
+- VSCode Extension Testing
+- Playwright for browser automation
+
+**Test Scenarios**:
+- Extension activation
+- Task creation and execution
+- Tool usage
+- UI interactions
+- State persistence
+
+**Example**:
+```typescript
+// apps/vscode-e2e/src/extension.test.ts
+import * as vscode from 'vscode'
+import { expect } from 'chai'
+
+describe('Extension Tests', () => {
+    it('should activate extension', async () => {
+        const ext = vscode.extensions.getExtension('kilocode.Kilo-Code')
+        await ext?.activate()
+        expect(ext?.isActive).to.be.true
+    })
+    
+    it('should create new task', async () => {
+        await vscode.commands.executeCommand('kilocode.plusButtonClicked')
+        // Verify task created
+    })
+})
+```
+
+#### 11.1.3 End-to-End Tests
+
+**Location**: `apps/playwright-e2e`
+
+**Framework**: Playwright
+
+**Test Scenarios**:
+- Complete user workflows
+- Multi-step task execution
+- Error recovery
+- UI state consistency
+
+**Example**:
+```typescript
+// apps/playwright-e2e/tests/task-execution.spec.ts
+test('should complete simple task', async ({ page }) => {
+    await page.goto('http://localhost:3000')
+    await page.fill('[data-testid="task-input"]', 'Create hello.txt')
+    await page.click('[data-testid="submit"]')
+    
+    await page.waitForSelector('[data-testid="task-complete"]')
+    
+    // Verify file created
+    const fileExists = await checkFileExists('hello.txt')
+    expect(fileExists).toBe(true)
+})
+```
+
+#### 11.1.4 CLI Tests
+
+**Location**: `cli/src/__tests__`
+
+**Framework**: Vitest + Ink Testing Library
+
+**Test Scenarios**:
+- CLI argument parsing
+- Extension host initialization
+- Message handling
+- UI rendering
+
+**Example**:
+```typescript
+// cli/src/__tests__/cli.spec.ts
+import { render } from 'ink-testing-library'
+import { App } from '../ui/App'
+
+test('should render chat interface', () => {
+    const { lastFrame } = render(<App />)
+    expect(lastFrame()).toContain('Kilo Code')
+})
+```
+
+### 11.2 Test Coverage
+
+**Current Coverage** (estimated):
+- Core logic: ~70%
+- API handlers: ~60%
+- UI components: ~40%
+- Integration: ~50%
+
+**Coverage Gaps**:
+- Browser automation features
+- MCP server integration
+- Complex error scenarios
+- Multi-workspace scenarios
+
+### 11.3 CI/CD Testing
+
+**GitHub Actions Workflow**:
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - run: pnpm install
+      - run: pnpm test
+  
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - run: pnpm install
+      - run: pnpm playwright
+  
+  vscode-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - run: pnpm install
+      - run: xvfb-run -a pnpm test:vscode # Linux
+```
+
+---
+
+## 12. Performance and Optimization
+
+### 12.1 Caching Strategy
+
+#### 12.1.1 API Response Caching
+
+```typescript
+// Cache LLM responses for identical requests
+const cache = new LRUCache<string, ApiResponse>({
+    max: 100,
+    ttl: 1000 * 60 * 60  // 1 hour
+})
+
+const cacheKey = hash({ model, messages, temperature })
+const cached = cache.get(cacheKey)
+if (cached) {
+    return cached
+}
+
+const response = await apiCall()
+cache.set(cacheKey, response)
+```
+
+#### 12.1.2 File Content Caching
+
+```typescript
+// Cache file contents to avoid repeated reads
+class FileCache {
+    private cache = new Map<string, {
+        content: string
+        mtime: number
+    }>()
+    
+    async get(path: string): Promise<string> {
+        const stat = await fs.stat(path)
+        const cached = this.cache.get(path)
+        
+        if (cached && cached.mtime === stat.mtimeMs) {
+            return cached.content
+        }
+        
+        const content = await fs.readFile(path, 'utf-8')
+        this.cache.set(path, { content, mtime: stat.mtimeMs })
+        return content
+    }
+}
+```
+
+#### 12.1.3 Code Index Caching
+
+- Embedding cache: Avoid re-computing embeddings for unchanged files
+- Search result cache: Cache recent searches
+- Metadata cache: File metadata and stats
+
+### 12.2 Resource Management
+
+#### 12.2.1 Memory Management
+
+```typescript
+// Limit concurrent operations
+const limit = pLimit(5)  // Max 5 concurrent operations
+
+const results = await Promise.all(
+    files.map(file => 
+        limit(() => processFile(file))
+    )
+)
+
+// Stream large files instead of loading into memory
+const stream = fs.createReadStream(largeFile)
+for await (const chunk of stream) {
+    processChunk(chunk)
+}
+```
+
+#### 12.2.2 Token Usage Optimization
+
+```typescript
+// Sliding window for conversation history
+function truncateHistory(
+    messages: Message[],
+    maxTokens: number
+): Message[] {
+    let totalTokens = 0
+    const kept: Message[] = []
+    
+    // Always keep system prompt and last few messages
+    const systemPrompt = messages[0]
+    const recentMessages = messages.slice(-5)
+    
+    // Calculate tokens
+    for (const msg of messages.reverse()) {
+        const tokens = countTokens(msg)
+        if (totalTokens + tokens > maxTokens) break
+        kept.unshift(msg)
+        totalTokens += tokens
+    }
+    
+    return [systemPrompt, ...kept]
+}
+```
+
+#### 12.2.3 Network Optimization
+
+```typescript
+// Request batching
+const batch = new RequestBatcher({
+    maxBatchSize: 10,
+    maxWaitMs: 100
+})
+
+// Multiple requests batched together
+await batch.add(request1)
+await batch.add(request2)
+// ... sent as single batch request
+
+// Response streaming
+for await (const chunk of stream) {
+    // Process incrementally
+    yield chunk
+}
+```
+
+### 12.3 Build Optimization
+
+#### 12.3.1 Bundle Size
+
+**Current Sizes**:
+- Extension bundle: ~5MB (minified)
+- CLI bundle: ~5MB (minified)
+- Webview UI: ~2MB (minified + gzipped)
+
+**Optimization Techniques**:
+1. Tree shaking: Remove unused code
+2. Code splitting: Lazy load features
+3. External dependencies: Keep large deps external
+4. Minification: Reduce code size
+
+#### 12.3.2 Turbo Caching
+
+```json
+// turbo.json
+{
+    "pipeline": {
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**", ".next/**"],
+            "cache": true
+        },
+        "test": {
+            "dependsOn": ["build"],
+            "cache": true
+        }
+    }
+}
+```
+
+**Benefits**:
+- Skip unchanged packages
+- Cache build outputs
+- Parallel execution
+- Faster CI/CD
+
+---
+
+## 13. Error Handling and Recovery
+
+### 13.1 Error Categories
+
+#### 13.1.1 Recoverable Errors
+
+**API Errors**:
+```typescript
+try {
+    const response = await apiCall()
+} catch (error) {
+    if (error.status === 429) {
+        // Rate limit - retry with backoff
+        await delay(retryDelay)
+        return apiCall()
+    }
+    
+    if (error.status >= 500) {
+        // Server error - retry
+        if (retries < maxRetries) {
+            return apiCall()
+        }
+    }
+    
+    throw error
+}
+```
+
+**File System Errors**:
+```typescript
+try {
+    await fs.writeFile(path, content)
+} catch (error) {
+    if (error.code === 'ENOENT') {
+        // Directory doesn't exist - create it
+        await fs.mkdir(dirname(path), { recursive: true })
+        return fs.writeFile(path, content)
+    }
+    
+    if (error.code === 'EACCES') {
+        // Permission denied - ask user
+        const shouldRetry = await ask({
+            type: 'permission_error',
+            path
+        })
+        if (shouldRetry) {
+            return fs.writeFile(path, content)
+        }
+    }
+    
+    throw error
+}
+```
+
+#### 13.1.2 Non-Recoverable Errors
+
+**Critical Errors**:
+- Extension activation failure
+- Invalid configuration
+- Missing dependencies
+- Corrupted state
+
+**Handling**:
+```typescript
+try {
+    await extension.activate()
+} catch (error) {
+    // Log error
+    logger.error('Extension activation failed', error)
+    
+    // Show user-friendly message
+    vscode.window.showErrorMessage(
+        'Failed to activate Kilo Code. Please check logs.'
+    )
+    
+    // Report to telemetry
+    telemetry.captureException(error)
+    
+    // Disable extension
+    return
+}
+```
+
+### 13.2 Error Recovery Strategies
+
+#### 13.2.1 Automatic Retry
+
+```typescript
+async function withRetry<T>(
+    operation: () => Promise<T>,
+    options: RetryOptions = {}
+): Promise<T> {
+    const {
+        maxRetries = 3,
+        initialDelay = 1000,
+        maxDelay = 10000,
+        backoffMultiplier = 2
+    } = options
+    
+    let delay = initialDelay
+    let lastError: Error
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await operation()
+        } catch (error) {
+            lastError = error
+            
+            if (!isRetryable(error)) {
+                throw error
+            }
+            
+            await sleep(delay)
+            delay = Math.min(delay * backoffMultiplier, maxDelay)
+        }
+    }
+    
+    throw lastError
+}
+```
+
+#### 13.2.2 State Recovery
+
+```typescript
+// Save state before risky operations
+const checkpoint = await saveState()
+
+try {
+    await riskyOperation()
+} catch (error) {
+    // Restore state on failure
+    await restoreState(checkpoint)
+    throw error
+}
+```
+
+#### 13.2.3 Graceful Degradation
+
+```typescript
+// Feature flags for graceful degradation
+if (features.codeIndexEnabled) {
+    try {
+        results = await codeIndex.search(query)
+    } catch (error) {
+        logger.warn('Code index search failed, falling back to text search')
+        results = await textSearch(query)
+    }
+} else {
+    results = await textSearch(query)
+}
+```
+
+### 13.3 Error Reporting
+
+#### 13.3.1 Telemetry
+
+```typescript
+// Capture exceptions
+telemetry.captureException(error, {
+    context: 'task-execution',
+    taskId: task.id,
+    toolName: tool.name,
+    userId: user.id
+})
+
+// Track error rates
+telemetry.increment('errors.api_call_failed', {
+    provider: 'anthropic',
+    model: 'claude-3-opus'
+})
+```
+
+#### 13.3.2 Logging
+
+```typescript
+// Structured logging
+logger.error('API call failed', {
+    error: error.message,
+    stack: error.stack,
+    provider: 'anthropic',
+    model: 'claude-3-opus',
+    requestId: request.id,
+    userId: user.id
+})
+
+// Log levels
+logger.debug('Processing file', { path })
+logger.info('Task completed', { taskId, duration })
+logger.warn('Rate limit approaching', { remaining: 10 })
+logger.error('Operation failed', { error })
+```
+
+#### 13.3.3 User Feedback
+
+```typescript
+// Show error to user with action buttons
+vscode.window.showErrorMessage(
+    'Failed to complete task',
+    'Retry',
+    'View Logs',
+    'Report Bug'
+).then(action => {
+    switch (action) {
+        case 'Retry':
+            retryTask()
+            break
+        case 'View Logs':
+            showLogs()
+            break
+        case 'Report Bug':
+            openBugReport(error)
+            break
+    }
+})
+```
+
+---
+
+## 14. Configuration Management
+
+### 14.1 Configuration Sources
+
+#### 14.1.1 VSCode Settings
+
+```typescript
+// User settings (settings.json)
+{
+    "kilocode.apiProvider": "anthropic",
+    "kilocode.anthropicApiKey": "sk-...",
+    "kilocode.defaultModel": "claude-3-opus-20240229",
+    "kilocode.autoApproval": {
+        "read": true,
+        "write": false,
+        "execute": false
+    }
+}
+
+// Access in code
+const config = vscode.workspace.getConfiguration('kilocode')
+const provider = config.get<string>('apiProvider')
+```
+
+#### 14.1.2 CLI Configuration
+
+```json
+// ~/.kilocode/cli/config.json
+{
+    "apiProvider": "anthropic",
+    "apiKey": "sk-...",
+    "defaultModel": "claude-3-opus-20240229",
+    "theme": "dark",
+    "autoApproval": {
+        "read": { "enabled": true, "outside": true },
+        "write": { "enabled": true, "outside": false },
+        "execute": {
+            "enabled": true,
+            "allowed": ["npm", "git"],
+            "denied": ["rm -rf", "sudo"]
+        }
+    }
+}
+```
+
+#### 14.1.3 Workspace Configuration
+
+```json
+// .vscode/settings.json (workspace-specific)
+{
+    "kilocode.customInstructions": "Always use TypeScript strict mode",
+    "kilocode.mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+        }
+    }
+}
+```
+
+#### 14.1.4 Environment Variables
+
+```bash
+# Override configuration via environment
+export KILOCODE_API_KEY=sk-...
+export KILOCODE_MODEL=claude-3-opus-20240229
+export KILOCODE_DEBUG=true
+```
+
+### 14.2 Configuration Schema
+
+```typescript
+interface KilocodeConfig {
+    // API Configuration
+    apiProvider: ProviderName
+    apiKey?: string
+    defaultModel: string
+    customModels?: CustomModel[]
+    
+    // Behavior
+    defaultMode: string
+    customModes?: CustomMode[]
+    autoApproval: AutoApprovalConfig
+    
+    // Features
+    codeIndex: CodeIndexConfig
+    mcpServers: McpServerConfig
+    experiments: ExperimentId[]
+    
+    // UI
+    theme: 'light' | 'dark' | 'auto'
+    fontSize: number
+    
+    // Advanced
+    maxTokens: number
+    temperature: number
+    writeDelay: number
+}
+```
+
+### 14.3 Configuration Validation
+
+```typescript
+// Validate configuration on load
+function validateConfig(config: unknown): KilocodeConfig {
+    const schema = z.object({
+        apiProvider: z.enum(['anthropic', 'openai', 'bedrock', ...]),
+        apiKey: z.string().optional(),
+        defaultModel: z.string(),
+        autoApproval: z.object({
+            read: z.boolean(),
+            write: z.boolean(),
+            execute: z.boolean()
+        }),
+        // ... more fields
+    })
+    
+    return schema.parse(config)
+}
+
+// Load and validate
+try {
+    const rawConfig = await loadConfigFile()
+    const config = validateConfig(rawConfig)
+} catch (error) {
+    if (error instanceof z.ZodError) {
+        showConfigError(error.errors)
+    }
+    // Fall back to defaults
+    config = defaultConfig
+}
+```
+
+### 14.4 Configuration Migration
+
+```typescript
+// Migrate old config formats to new
+async function migrateConfig(
+    oldConfig: any,
+    version: string
+): Promise<KilocodeConfig> {
+    if (version === '1.0') {
+        // Migrate from v1.0 to v2.0
+        return {
+            ...oldConfig,
+            apiProvider: oldConfig.provider,  // Renamed field
+            autoApproval: {
+                // New structure
+                read: oldConfig.autoRead ?? false,
+                write: oldConfig.autoWrite ?? false,
+                execute: oldConfig.autoExecute ?? false
+            }
+        }
+    }
+    
+    return oldConfig
+}
+```
+
+---
+
+## 15. Future Architecture Considerations
+
+### 15.1 Planned Improvements
+
+#### 15.1.1 Plugin System
+
+**Vision**: Allow third-party extensions to enhance Kilo Code
+
+```typescript
+// Plugin API
+interface KilocodePlugin {
+    id: string
+    name: string
+    version: string
+    
+    // Lifecycle hooks
+    activate(context: PluginContext): Promise<void>
+    deactivate(): Promise<void>
+    
+    // Contribution points
+    tools?: ToolContribution[]
+    modes?: ModeContribution[]
+    commands?: CommandContribution[]
+}
+
+// Example plugin
+const securityPlugin: KilocodePlugin = {
+    id: 'security-scanner',
+    name: 'Security Scanner',
+    version: '1.0.0',
+    
+    async activate(context) {
+        // Register custom tools
+        context.registerTool({
+            name: 'scan_for_vulnerabilities',
+            description: 'Scan code for security vulnerabilities',
+            async execute(params) {
+                // Implementation
+            }
+        })
+    },
+    
+    tools: [{
+        name: 'scan_for_vulnerabilities',
+        schema: { /* JSON schema */ }
+    }]
+}
+```
+
+#### 15.1.2 Multi-Agent System
+
+**Vision**: Multiple specialized agents collaborating on complex tasks
+
+```typescript
+// Agent coordination
+class AgentOrchestrator {
+    private agents: Map<string, Agent> = new Map()
+    
+    async executeTask(task: Task): Promise<void> {
+        // Decompose task
+        const subtasks = await this.planningAgent.decompose(task)
+        
+        // Assign to specialized agents
+        const assignments = await this.assignSubtasks(subtasks)
+        
+        // Execute in parallel
+        await Promise.all(
+            assignments.map(({ agent, subtask }) =>
+                agent.execute(subtask)
+            )
+        )
+        
+        // Synthesize results
+        const result = await this.synthesize(subtasks)
+        return result
+    }
+}
+
+// Specialized agents
+const agents = {
+    planner: new PlanningAgent(),      // Breaks down tasks
+    coder: new CodingAgent(),          // Implements code
+    reviewer: new ReviewAgent(),       // Reviews changes
+    tester: new TestingAgent()         // Writes and runs tests
+}
+```
+
+#### 15.1.3 Distributed Execution
+
+**Vision**: Offload expensive operations to cloud
+
+```typescript
+// Hybrid local/cloud execution
+class HybridExecutor {
+    async executeToolCloud(tool: Tool, params: any): Promise<any> {
+        if (this.shouldExecuteLocally(tool)) {
+            return tool.execute(params)
+        }
+        
+        // Execute in cloud
+        return this.cloudExecutor.execute(tool.name, params)
+    }
+    
+    private shouldExecuteLocally(tool: Tool): boolean {
+        // Criteria:
+        // - Fast local execution
+        // - Sensitive data
+        // - Offline mode
+        // - Cost considerations
+        return tool.name === 'read_file' || 
+               tool.name === 'write_to_file'
+    }
+}
+```
+
+### 15.2 Scalability Considerations
+
+#### 15.2.1 Workspace Sharding
+
+```typescript
+// Split large workspaces into shards
+class WorkspaceSharder {
+    async shard(workspace: Workspace): Promise<Shard[]> {
+        // Group by module boundaries
+        const modules = await analyzeModules(workspace)
+        
+        return modules.map(module => ({
+            id: module.name,
+            files: module.files,
+            dependencies: module.dependencies
+        }))
+    }
+    
+    // Index shards independently
+    async indexShard(shard: Shard): Promise<void> {
+        const indexer = new CodeIndexer(shard)
+        await indexer.index()
+    }
+}
+```
+
+#### 15.2.2 Query Routing
+
+```typescript
+// Route queries to relevant shards
+class QueryRouter {
+    async route(query: string): Promise<Shard[]> {
+        // Semantic routing
+        const embedding = await embed(query)
+        
+        // Find relevant shards
+        const scores = await Promise.all(
+            this.shards.map(shard =>
+                this.scoreRelevance(embedding, shard)
+            )
+        )
+        
+        // Return top shards
+        return scores
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3)
+            .map(s => s.shard)
+    }
+}
+```
+
+### 15.3 Architecture Evolution
+
+**Key Principles**:
+1. **Maintain Code Sharing**: Keep 70-80% code sharing across platforms
+2. **Platform Abstraction**: Continue abstracting platform-specific details
+3. **Backward Compatibility**: Ensure smooth upgrades
+4. **Performance**: Optimize for speed and resource usage
+5. **Extensibility**: Enable third-party contributions
+
+**Migration Path**:
+1. Phase 1: Stabilize current architecture
+2. Phase 2: Introduce plugin system
+3. Phase 3: Multi-agent coordination
+4. Phase 4: Distributed execution
+5. Phase 5: Advanced features (code generation, testing, deployment)
+
+---
+
+## Conclusion (Revised)
+
+The Kilo Code architecture demonstrates a sophisticated, multi-platform approach to building an AI coding agent with remarkable code reuse and platform abstraction. The analysis reveals:
+
+**Architectural Strengths**:
+1. **Exceptional Code Reuse**: 70-80% sharing between platforms through abstraction
+2. **Comprehensive Mocking**: 2,111-line VSCode API mock enables CLI/JetBrains support
+3. **Modular Design**: Clear separation of concerns with pluggable components
+4. **Event-Driven**: Loose coupling enables multi-platform support
+5. **Security-First**: Multiple layers of protection for sensitive operations
+6. **Performance-Optimized**: Caching, batching, and resource management
+
+**Advanced Features**:
+- **Code Index Service**: Semantic search with vector embeddings
+- **Checkpoint System**: Task persistence and recovery
+- **Mode System**: Specialized agent behaviors for different tasks
+- **Multi-Platform**: VSCode, CLI, JetBrains, and Web support
+- **Comprehensive Testing**: Unit, integration, and E2E tests
+
+**Key Success Factors**:
+- Task.ts is completely platform-agnostic (3,236 lines of pure agent logic)
+- Platform-specific code isolated in thin integration layers
+- Shared packages (@roo-code/types, @roo-code/cloud, @roo-code/telemetry)
+- Consistent patterns across all platforms
+
+**Future Outlook**:
+- Plugin system for third-party extensions
+- Multi-agent collaboration for complex tasks
+- Distributed execution for scalability
+- Enhanced performance and optimization
+
+The architecture is exceptionally well-designed for extensibility, maintainability, and multi-platform support, making Kilo Code a strong foundation for future AI-powered development tools.

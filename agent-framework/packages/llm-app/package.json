@@ -1,0 +1,29 @@
+{
+  "name": "@agent-framework/llm-app",
+  "version": "0.1.0",
+  "description": "LLM application with tools but without agentic loop",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@agent-framework/types": "workspace:*",
+    "@agent-framework/api": "workspace:*",
+    "@agent-framework/tools": "workspace:*",
+    "@agent-framework/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.5"
+  }
+}

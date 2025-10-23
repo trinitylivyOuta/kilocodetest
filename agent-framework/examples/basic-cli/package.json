@@ -1,0 +1,24 @@
+{
+  "name": "basic-cli-example",
+  "version": "0.1.0",
+  "description": "Basic CLI example using Agent Framework",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-framework/core": "workspace:*",
+    "@agent-framework/api": "workspace:*",
+    "@agent-framework/tools": "workspace:*",
+    "@agent-framework/runtime": "workspace:*",
+    "@agent-framework/types": "workspace:*"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@agent-framework/llm-client",
+  "version": "0.1.0",
+  "description": "Direct LLM client for low-level access without agent framework",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@agent-framework/types": "workspace:*",
+    "@agent-framework/api": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.5"
+  }
+}
